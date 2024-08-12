@@ -1,6 +1,7 @@
 package com.koshys.votemobs.registries;
 
 import com.koshys.votemobs.entities.Crab;
+import com.koshys.votemobs.entities.Penguin;
 import eu.pb4.polymer.core.api.entity.PolymerEntityUtils;
 import eu.pb4.polymer.core.api.item.PolymerItemGroupUtils;
 import eu.pb4.polymer.core.api.item.PolymerSpawnEggItem;
@@ -32,6 +33,15 @@ public class MobRegistry {
                     .defaultAttributes(Crab::createAttributes)
     );
 
+    public static final EntityType<Penguin> PENGUIN = register(
+            Penguin.ID,
+            FabricEntityTypeBuilder.createMob()
+                    .entityFactory(Penguin::new)
+                    .spawnGroup(MobCategory.CREATURE)
+                    .dimensions(EntityDimensions.scalable(0.8f, 0.6f))
+                    .defaultAttributes(Penguin::createAttributes)
+    );
+
 
     private static <T extends Entity> EntityType<T> register(ResourceLocation id, FabricEntityTypeBuilder<T> builder) {
         EntityType<T> type = builder.build();
@@ -41,14 +51,21 @@ public class MobRegistry {
 
     public static void registerMobs() {
 
-        // Use BiomeModifications.addSpawn to define spawn rules
+        // Crab spawn
         BiomeModifications.addSpawn(BiomeSelectors.spawnsOneOf(EntityType.TURTLE)
                         .or(BiomeSelectors.tag(BiomeTags.IS_BEACH))
                         .or(BiomeSelectors.includeByKey(Biomes.BEACH)),
-                MobCategory.CREATURE, CRAB, 10, 1, 3);
+                MobCategory.CREATURE, CRAB, 5, 1, 3);
 
+        //Penguin spawn
+        BiomeModifications.addSpawn(BiomeSelectors.spawnsOneOf(EntityType.POLAR_BEAR, EntityType.DOLPHIN)
+                        .or(BiomeSelectors.includeByKey(Biomes.SNOWY_BEACH, Biomes.COLD_OCEAN, Biomes.DEEP_COLD_OCEAN,
+                                Biomes.FROZEN_OCEAN, Biomes.FROZEN_RIVER, Biomes.DEEP_FROZEN_OCEAN, Biomes.ICE_SPIKES, Biomes.SNOWY_PLAINS)),
+                MobCategory.CREATURE, PENGUIN, 10, 2, 6);
 
+        //Eggs
         addSpawnEgg(CRAB, Items.TURTLE_SPAWN_EGG);
+        addSpawnEgg(PENGUIN, Items.BAT_SPAWN_EGG);
 
         PolymerItemGroupUtils.registerPolymerItemGroup(Util.id("spawn-eggs"), ITEM_GROUP);
     }
