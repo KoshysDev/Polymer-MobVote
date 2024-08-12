@@ -6,7 +6,7 @@ import com.koshys.votemobs.registries.MobRegistry;
 import com.koshys.votemobs.registries.SoundRegistry;
 
 public class VoteMobs implements ModInitializer {
-	public static final String MODID = "model/votemobs";
+	public static final String MODID = "votemobs";
 
 	@Override
 	public void onInitialize() {

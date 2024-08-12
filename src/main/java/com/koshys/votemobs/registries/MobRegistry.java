@@ -42,13 +42,13 @@ public class MobRegistry {
     public static void registerMobs() {
 
         // Use BiomeModifications.addSpawn to define spawn rules
-        BiomeModifications.addSpawn(BiomeSelectors.spawnsOneOf(EntityType.SALMON)
+        BiomeModifications.addSpawn(BiomeSelectors.spawnsOneOf(EntityType.TURTLE)
                         .or(BiomeSelectors.tag(BiomeTags.IS_BEACH))
-                        .or(BiomeSelectors.includeByKey(Biomes.WARM_OCEAN, Biomes.LUSH_CAVES, Biomes.OCEAN, Biomes.DEEP_OCEAN)),
-                MobCategory.CREATURE, CRAB, 30, 1, 3);
+                        .or(BiomeSelectors.includeByKey(Biomes.BEACH)),
+                MobCategory.CREATURE, CRAB, 10, 1, 3);
 
 
-        addSpawnEgg(CRAB, Items.SALMON_SPAWN_EGG);
+        addSpawnEgg(CRAB, Items.TURTLE_SPAWN_EGG);
 
         PolymerItemGroupUtils.registerPolymerItemGroup(Util.id("spawn-eggs"), ITEM_GROUP);
     }
@@ -66,7 +66,7 @@ public class MobRegistry {
 
     public static final Object2ObjectOpenHashMap<ResourceLocation, Item> SPAWN_EGGS = new Object2ObjectOpenHashMap<>();
     public static final CreativeModeTab ITEM_GROUP = new CreativeModeTab.Builder(null, -1)
-            .title(Component.literal("VoteMobs").withStyle(ChatFormatting.DARK_GREEN))
+            .title(Component.literal("VoteMobs").withStyle(ChatFormatting.WHITE))
             .icon(Items.BAT_SPAWN_EGG::getDefaultInstance)
             .displayItems((parameters, output) -> SPAWN_EGGS.values().forEach(output::accept))
             .build();
