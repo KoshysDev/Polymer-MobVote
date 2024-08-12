@@ -6,9 +6,12 @@ import de.tomalbrc.bil.core.holder.entity.EntityHolder;
 import de.tomalbrc.bil.core.holder.entity.living.LivingEntityHolder;
 import de.tomalbrc.bil.core.model.Model;
 import eu.pb4.polymer.virtualentity.api.attachment.EntityAttachment;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerWorldEvents;
+import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.*;
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
@@ -30,11 +33,19 @@ import com.koshys.votemobs.util.AnimationHelper;
 import com.koshys.votemobs.util.Util;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.effect.MobEffects;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.effect.*;
+
+import java.util.Random;
 
 public class Crab extends Animal implements AnimatedEntity, PlayerRideable {
     public static final ResourceLocation ID = Util.id("crab");
     public static final Model MODEL = Util.loadModel(ID);
     private final EntityHolder<Crab> holder;
+    private int feedingTimer = 0; // A timer to control how often the crab can eat
+    private final Random random = new Random();
 
     public static AttributeSupplier.Builder createAttributes() {
         return Mob.createMobAttributes()
@@ -61,7 +72,13 @@ public class Crab extends Animal implements AnimatedEntity, PlayerRideable {
     protected void registerGoals() {
         this.goalSelector.addGoal(1, new FloatGoal(this));
 
-        this.goalSelector.addGoal(3, new TemptGoal(this, 1.0, Ingredient.of(Items.SUGAR, Items.SUGAR_CANE, Items.BAMBOO), true));
+        // Tempt goal for feeding
+        this.goalSelector.addGoal(3, new TemptGoal(this, 1.0, Ingredient.of(Items.SUGAR, Items.SUGAR_CANE, Items.BAMBOO), true) {
+            @Override
+            public boolean canUse() {
+                return super.canUse() && feedingTimer <= 0;
+            }
+        });
         this.goalSelector.addGoal(4, new PanicGoal(this, 0.6));
         this.goalSelector.addGoal(7, new WaterAvoidingRandomStrollGoal(this, 0.5));
         this.goalSelector.addGoal(8, new RandomLookAroundGoal(this));
@@ -70,7 +87,9 @@ public class Crab extends Animal implements AnimatedEntity, PlayerRideable {
 
     @Override
     public boolean isFood(ItemStack stack) {
-        return false;  // You can return true for any items you want the crab to eat
+        // Check if the stack is an item you want the crab to eat
+        Item item = stack.getItem();
+        return item == Items.SUGAR || item == Items.SUGAR_CANE || item == Items.BAMBOO;
     }
 
     @Override
@@ -80,6 +99,11 @@ public class Crab extends Animal implements AnimatedEntity, PlayerRideable {
         if (this.tickCount % 2 == 0) {
             AnimationHelper.updateWalkAnimation(this, this.holder);
             AnimationHelper.updateHurtVariant(this, this.holder);
+        }
+
+        // Handle feeding timer
+        if (feedingTimer > 0) {
+            feedingTimer--;
         }
     }
 
@@ -92,61 +116,52 @@ public class Crab extends Animal implements AnimatedEntity, PlayerRideable {
     @Override
     @NotNull
     public InteractionResult mobInteract(Player player, InteractionHand interactionHand) {
-        if (!this.isBaby() && interactionHand == InteractionHand.MAIN_HAND && player.getMainHandItem().isEmpty()) {
-            this.doPlayerRide(player);
-            return InteractionResult.sidedSuccess(this.level().isClientSide);
-        } else {
-            return super.mobInteract(player, interactionHand);
+        if (!this.isBaby() && interactionHand == InteractionHand.MAIN_HAND && !player.getMainHandItem().isEmpty()) {
+            ItemStack stack = player.getMainHandItem();
+            if (isFood(stack) && feedingTimer <= 0) {
+                // Player is feeding the crab
+                feed(player);
+                return InteractionResult.sidedSuccess(this.level().isClientSide);
+            }
+        }
+
+        return InteractionResult.sidedSuccess(this.level().isClientSide);
+    }
+
+    private void feed(Player player) {
+        ItemStack stack = player.getMainHandItem();
+        if (isFood(stack)) {
+            // Play feeding animation
+            //this.level().addParticle(ParticleTypes.HEART, this.getX(), this.getY() + 0.5, this.getZ(), 0, 0, 0);
+            stack.shrink(1);
+            //player.playSound(VoteMobs.SOUNDS.CRAB_EAT, 1.0F, 1.0F);
+
+            // Handle item drop
+            if (random.nextBoolean()) { // 50/50 chance
+                Item dropItem = Items.KELP; // Change this to your desired item
+                this.spawnAtLocation(new ItemStack(dropItem));
+            }
+
+            // Reset timer
+            feedingTimer = random.nextInt(20*20) + 500; // Random between 25 and 75 seconds
         }
     }
 
-    protected void doPlayerRide(Player player) {
-        if (!this.level().isClientSide) {
-            player.setYRot(this.getYRot());
-            player.setXRot(this.getXRot());
-            player.startRiding(this);
-        }
-    }
-
     @Override
-    protected float getRiddenSpeed(Player player) {
-        return (float) this.getAttributeValue(Attributes.MOVEMENT_SPEED) / 2.f;
-    }
+    public void die(DamageSource damageSource) {
+        super.die(damageSource);
 
-    @Override
-    public boolean isControlledByLocalInstance() {
-        LivingEntity passenger = this.getControllingPassenger();
-        return passenger instanceof ServerPlayer || this.isEffectiveAi();
-    }
-
-    @Nullable
-    @Override
-    public LivingEntity getControllingPassenger() {
-        Entity passenger = this.getFirstPassenger();
-        if (passenger instanceof ServerPlayer player) {
-            return player;
-        } else if (!this.isNoAi() && passenger instanceof Mob mob) {
-            return mob;
-        }
-        return null;
-    }
-
-    @Override
-    @NotNull
-    protected Vec3 getRiddenInput(Player player, Vec3 vec3) {
-        float x = player.xxa * 0.5F;
-        float z = player.zza;
-        if (z <= 0.0F) {
-            z *= 0.25F;
+        // Drop Big Claw Part (5% chance)
+        if (random.nextInt(20) == 0) {
+            this.spawnAtLocation(new ItemStack(Items.BLACK_DYE));
+            //this.spawnAtLocation(new ItemStack(VoteMobs.BIG_CLAW_PART));
         }
 
-        return new Vec3(x, 0.0, z);
-    }
-
-    @Override
-    protected void tickRidden(Player player, Vec3 vec3) {
-        this.setRot(player.getYRot(), player.getXRot() * 0.5F);
-        this.yRotO = this.yBodyRot = this.yHeadRot = this.getYRot();
+        // Drop Small Claw Part (5% chance)
+        if (random.nextInt(20) == 0) {
+            //this.spawnAtLocation(new ItemStack(VoteMobs.SMALL_CLAW_PART));
+            this.spawnAtLocation(new ItemStack(Items.RED_DYE));
+        }
     }
 
     @Override
